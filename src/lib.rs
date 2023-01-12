@@ -23,8 +23,6 @@ pub trait WaveShape<'a, NodeId: 'a, NodeValue: 'a + Clone, Kernel: 'a> {
     fn iter_nodes(&'a mut self) -> impl Iterator<Item = &mut Node<NodeId, NodeValue>>;
 }
 
-pub trait WaveKernel {}
-
 /// This describes a single node within the wave function. It contains all possible values this node can
 /// be collopsed into.
 #[derive(Clone)]
