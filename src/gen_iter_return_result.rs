@@ -23,6 +23,8 @@ where
     G::Return: ResultRc<T>,
 {
     fn calc_result(self) -> Result<Rc<T>, WaveCollapseError> {
+        // FIXME: for some reason I'm not allowed to use self in this function.
+        //      Moving it into foo seems to fix the issue
         let mut foo = self;
         while let Some(_s) = Iterator::next(&mut &mut foo) {}
 
