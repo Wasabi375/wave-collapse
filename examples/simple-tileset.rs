@@ -1,3 +1,4 @@
+use wave_collapse::gen_iter_return_result::GenIterReturnResult;
 use wave_collapse::tile2d::*;
 use wave_collapse::*;
 
@@ -32,7 +33,7 @@ impl TileSolver {
     }
 }
 
-impl WaveSolver<Tile2D, Kernel2D<'_, Tile2D>> for TileSolver {
+impl WaveSolver<Tile2D, Kernel2D<Tile2D>> for TileSolver {
     fn is_valid(&self, tile: &Tile2D, kernel: &Kernel2D<Tile2D>) -> bool {
         self.is_tile_valid(tile, kernel)
     }
@@ -91,10 +92,14 @@ fn main() {
         },
     ];
 
-    let mut shape = TileMap2D::new(Size2D::square(10), Size2D::square(3), &tiles);
+    let shape = TileMap2D::new(Size2D::square(10), Size2D::square(3), &tiles);
 
-    if let Err(error) = collapse_wave(&mut shape, &tiles, &TileSolver) {
-        println!("error: {}", error);
-        return;
-    }
+    match collapse_wave(shape, &tiles, &TileSolver).calc_result() {
+        Ok(_shape) => {
+            todo!("handle resulting shape")
+        }
+        Err(error) => {
+            eprint!("Failed to run \"simple tilset\" with error {:?}", error)
+        }
+    };
 }

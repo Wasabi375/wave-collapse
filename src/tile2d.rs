@@ -1,6 +1,11 @@
+use std::rc::Rc;
+
 use vecgrid::Vecgrid;
 
-use crate::{Node, WaveShape};
+use crate::NodeIdIter;
+use crate::{Node, WaveKernel, WaveShape};
+
+use gen_iter::gen_iter;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Size2D {
@@ -69,43 +74,43 @@ impl<NodeValue: Clone> TileMap2D<NodeValue> {
             )
         }
     }
-
-    pub fn get(&self, index: Index2D) -> Option<&Node<Index2D, NodeValue>> {
-        self.nodes.get(index.0 as usize, index.1 as usize)
-    }
 }
 
-impl<'a, NodeValue> WaveShape<'a, Index2D, NodeValue, Kernel2D<'a, NodeValue>>
-    for TileMap2D<NodeValue>
+impl<NodeValue> WaveShape<Index2D, NodeValue> for TileMap2D<NodeValue>
 where
-    NodeValue: Clone + 'a,
+    NodeValue: Clone,
 {
-    fn create_kernel(&'a self, node: &Node<Index2D, NodeValue>) -> Kernel2D<'a, NodeValue> {
-        let radius_x = ((self.kernel_size.width - 1) / 2) as i64;
-        let radius_y = ((self.kernel_size.height - 1) / 2) as i64;
-
-        Kernel2D {
-            tile_map: &self,
-            node_id: node.id,
-            radius_x,
-            radius_y,
-        }
+    fn get_node(&self, id: &Index2D) -> Option<&Node<Index2D, NodeValue>> {
+        self.nodes.get(id.0 as usize, id.1 as usize)
     }
 
-    fn iter_nodes(&'a mut self) -> impl Iterator<Item = &mut Node<Index2D, NodeValue>> {
-        self.nodes.elements_row_major_iter_mut()
+    fn get_node_mut(&mut self, id: Index2D) -> Option<&mut Node<Index2D, NodeValue>> {
+        self.nodes.get_mut(id.0 as usize, id.1 as usize)
+    }
+
+    fn iter_node_ids(&self) -> NodeIdIter<Index2D> {
+        let vec: Vec<_> = gen_iter!({
+            for y in 0..self.size.height {
+                for x in 0..self.size.width {
+                    yield (x, y);
+                }
+            }
+        })
+        .collect();
+
+        vec.into_iter()
     }
 }
 
-pub struct Kernel2D<'a, NodeValue: Clone> {
-    tile_map: &'a TileMap2D<NodeValue>,
+pub struct Kernel2D<NodeValueDescription: Clone> {
+    tile_map: Rc<TileMap2D<NodeValueDescription>>,
     node_id: Index2D,
     pub radius_x: i64,
     pub radius_y: i64,
 }
 
-impl<NodeValue: Clone> Kernel2D<'_, NodeValue> {
-    pub fn get(&self, x: i64, y: i64) -> Option<&Node<Index2D, NodeValue>> {
+impl<NodeValueDescription: Clone> Kernel2D<NodeValueDescription> {
+    pub fn get(&self, x: i64, y: i64) -> Option<&Node<Index2D, NodeValueDescription>> {
         if x.abs() > self.radius_x || y.abs() > self.radius_y {
             return None;
         }
@@ -115,6 +120,44 @@ impl<NodeValue: Clone> Kernel2D<'_, NodeValue> {
             (self.node_id.1 as i64 + y) as u32,
         );
 
-        self.tile_map.get(index)
+        self.tile_map.get_node(&index)
+    }
+}
+
+impl<NodeValueDescription: Clone>
+    WaveKernel<Index2D, NodeValueDescription, TileMap2D<NodeValueDescription>>
+    for Kernel2D<NodeValueDescription>
+{
+    fn new(
+        shape: Rc<TileMap2D<NodeValueDescription>>,
+        node: &Node<Index2D, NodeValueDescription>,
+    ) -> Self {
+        let radius_y = ((shape.kernel_size.height - 1) / 2) as i64;
+        let radius_x = ((shape.kernel_size.width - 1) / 2) as i64;
+
+        Kernel2D {
+            tile_map: shape.clone(),
+            node_id: node.id,
+            radius_x,
+            radius_y,
+        }
+    }
+
+    fn iter_node_ids(&self) -> NodeIdIter<Index2D> {
+        let x_min = self.node_id.0 as i64 - self.radius_x;
+        let x_max = self.node_id.0 as i64 + self.radius_x;
+        let y_min = self.node_id.1 as i64 - self.radius_y;
+        let y_max = self.node_id.1 as i64 + self.radius_y;
+
+        let vec: Vec<_> = gen_iter!({
+            for y in y_min..=y_max {
+                for x in x_min..=x_max {
+                    yield (x as u32, y as u32);
+                }
+            }
+            return ();
+        })
+        .collect();
+        vec.into_iter()
     }
 }
