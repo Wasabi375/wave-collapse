@@ -7,8 +7,11 @@
 pub mod gen_iter_return_result;
 pub mod tile2d;
 
+use rand::{seq::SliceRandom, Rng};
 use std::{
     cell::{Ref, RefCell},
+    cmp::Reverse,
+    collections::BinaryHeap,
     fmt::Debug,
     marker::PhantomData,
     ops::Generator,
@@ -17,14 +20,14 @@ use std::{
 
 use gen_iter::{gen_iter_return, GenIterReturn};
 use thiserror::Error;
-type Result<T> = std::result::Result<T, WaveCollapseError>;
+pub type Result<T> = std::result::Result<T, WaveCollapseError>;
 
 type NodeIdIter<T> = std::vec::IntoIter<T>;
 
 /// This represents a set of rules that define how to colapse a given wave function.
 pub trait WaveSolver<NodeValue, Kernel> {
-    /// This function should return true, if a `NodeValue` is valid within a kernel
-    fn is_valid(&self, tile: &NodeValue, kernel: &Kernel) -> bool;
+    /// This function should return true, if a `value` is valid within a kernel
+    fn is_valid(&self, value: &NodeValue, kernel: &Kernel) -> bool;
 }
 
 /// A wave shape defines the dimension/size/shape of the wave function. It also provides functions
@@ -116,7 +119,9 @@ impl<Id, NodeValueDescription: Clone> Node<Id, NodeValueDescription> {
             None
         }
     }
+}
 
+impl<Id, NodeValueDescription> Node<Id, NodeValueDescription> {
     pub fn is_collapsed(&self) -> bool {
         self.possible_values.borrow().len() == 1
     }
@@ -133,6 +138,41 @@ impl<Id, NodeValueDescription: Clone> Node<Id, NodeValueDescription> {
 
     pub fn possibilities(&self) -> u32 {
         self.possible_values.borrow().len() as u32
+    }
+}
+
+impl<Id, NodeValueDescription> Eq for Node<Id, NodeValueDescription> where Id: Eq {}
+
+impl<Id, NodeValueDescription> PartialEq for Node<Id, NodeValueDescription>
+where
+    Id: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<Id, NodeValueDescription> PartialOrd for Node<Id, NodeValueDescription>
+where
+    Id: PartialEq,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self == other {
+            return Some(std::cmp::Ordering::Equal);
+        }
+        self.possibilities().partial_cmp(&other.possibilities())
+    }
+}
+
+impl<Id, NodeValueDescription> Ord for Node<Id, NodeValueDescription>
+where
+    Id: Eq,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self == other {
+            return std::cmp::Ordering::Equal;
+        }
+        self.possibilities().cmp(&other.possibilities())
     }
 }
 
@@ -175,20 +215,22 @@ where
     }
 }
 
-pub fn collapse_wave<Shape, NodeId, Value, Values, Kernel, Solver>(
+pub fn collapse_wave<'solver, Shape, NodeId, NodeValue, Kernel, Solver>(
     shape: Shape,
-    _possible_values: &Values, // TODO I think this is not necessary
-    solver: &Solver,
-) -> GenIterReturn<impl Generator<Yield = Rc<Shape>, Return = Result<Rc<Shape>>>>
+    solver: &'solver Solver,
+) -> GenIterReturn<impl Generator<Yield = Rc<Shape>, Return = Result<Rc<Shape>>> + '_>
 where
-    NodeId: Copy,
-    Value: Clone,
-    Values: IntoIterator<Item = Value>,
-    Shape: WaveShape<NodeId, Value>,
-    Kernel: WaveKernel<NodeId, Value, Shape>,
-    Solver: WaveSolver<Value, Kernel>,
+    NodeId: Copy + Eq,
+    NodeValue: Clone + PartialEq,
+    Shape: WaveShape<NodeId, NodeValue> + 'solver,
+    Kernel: WaveKernel<NodeId, NodeValue, Shape>,
+    Solver: WaveSolver<NodeValue, Kernel>,
 {
-    gen_iter_return!(move {
+    let result_iter = gen_iter_return!(move {
+
+        // TODO: let user pass in their own Rng
+        //      This should be useful for debugging, etc
+        let mut rng = rand::thread_rng();
 
         let shape = Rc::new(shape);
 
@@ -205,6 +247,8 @@ where
             }
 
             // find node with the least possible values, that is not collapsed
+            // FIXME: this should be a function of shape, which can be optimized using binaryheap, etc,
+            //      however we need to know when/how to upate the heap when a node changes
             let first_node = shape
                 .iter_nodes()
                 .filter(|n| !n.is_collapsed())
@@ -213,16 +257,55 @@ where
                     "This should only fail if all nodes are collapsed, but we checked that above",
                 );
 
-            // randomly choose a value from and assign it to the first node
 
-            // expand node
-            let first_node_kernel = Kernel::new(shape.clone(), &first_node);
+            // randomly choose a value from and assign it to the first node
+            collapse_node(&first_node, &mut rng);
+
+            let mut open_list = BinaryHeap::new();
+            open_list.push(Reverse(first_node));
+
+            while !open_list.is_empty() {
+                let node = open_list.pop().expect("open list is not empty").0;
+
+                let kernel = Kernel::new(shape.clone(), &node);
+
+                let mut values = node.possible_values.borrow_mut();
+                let possibilities_before = values.len();
+                values.retain(|v| solver.is_valid(v, &kernel));
+
+                if possibilities_before != values.len() {
+
+                    for node in kernel
+                        .iter_node_ids()
+                        .filter(|id| *id != node.id)
+                        .map(|id|shape.get_node(&id).expect("NodeIdIter is always valid")) {
+                        open_list.push(Reverse(node));
+                    };
+
+
+                }
+            }
 
             // yield the current state of the calculation. That way we can inspect every iteration easily.
             // also this might be interesting for animation or debugging
             yield shape.clone();
         }
-    })
+    });
+
+    result_iter
+}
+
+fn collapse_node<NodeId, NodeValue>(node: &Node<NodeId, NodeValue>, rng: &mut impl Rng)
+where
+    NodeValue: Clone + PartialEq,
+{
+    let mut node_values = node.possible_values.borrow_mut();
+    let collapsed_value = node_values
+        .choose(rng)
+        .expect("This should never be None, because the current shape is not overspecified.")
+        .clone();
+    node_values.clear();
+    node_values.push(collapsed_value);
 }
 
 trait IntoWaveCollapseErrorResult<T> {

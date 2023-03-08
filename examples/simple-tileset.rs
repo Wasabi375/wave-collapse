@@ -94,7 +94,7 @@ fn main() {
 
     let shape = TileMap2D::new(Size2D::square(10), Size2D::square(3), &tiles);
 
-    match collapse_wave(shape, &tiles, &TileSolver).calc_result() {
+    match collapse_wave(shape, &TileSolver).calc_result() {
         Ok(_shape) => {
             todo!("handle resulting shape")
         }
