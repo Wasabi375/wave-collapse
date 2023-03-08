@@ -136,7 +136,7 @@ impl<NodeValueDescription: Clone>
         let radius_x = ((shape.kernel_size.width - 1) / 2) as i64;
 
         Kernel2D {
-            tile_map: shape.clone(),
+            tile_map: shape,
             node_id: node.id,
             radius_x,
             radius_y,
@@ -155,7 +155,6 @@ impl<NodeValueDescription: Clone>
                     yield (x as u32, y as u32);
                 }
             }
-            return ();
         })
         .collect();
         vec.into_iter()

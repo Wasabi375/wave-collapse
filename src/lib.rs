@@ -35,7 +35,7 @@ pub trait WaveShape<NodeId, NodeValue: Clone> {
 
     /// returns an `Iterator` over all nodes in the wave function.
     fn iter_nodes(&self) -> NodeIter<'_, NodeId, NodeValue, Self> {
-        NodeIter::new(self.iter_node_ids(), &self)
+        NodeIter::new(self.iter_node_ids(), self)
     }
 
     fn get_node(&self, id: &NodeId) -> Option<&Node<NodeId, NodeValue>>;
@@ -83,7 +83,7 @@ pub trait WaveKernel<
 
     /// returns an `Iterator` over all nodes in the wave function.
     fn iter_nodes(&self) -> NodeIter<NodeId, NodeValueDescription, Self> {
-        NodeIter::new(self.iter_node_ids(), &self)
+        NodeIter::new(self.iter_node_ids(), self)
     }
 }
 
@@ -256,7 +256,7 @@ where
 
 
             // randomly choose a value from and assign it to the first node
-            collapse_node(&first_node, &mut rng);
+            collapse_node(first_node, &mut rng);
 
             let mut open_list = BinaryHeap::new();
             open_list.push(Reverse(first_node));
@@ -264,7 +264,7 @@ where
             while !open_list.is_empty() {
                 let node = open_list.pop().expect("open list is not empty").0;
 
-                let kernel = Kernel::new(shape.clone(), &node);
+                let kernel = Kernel::new(shape.clone(), node);
 
                 let mut values = node.possible_values.borrow_mut();
                 let possibilities_before = values.len();
