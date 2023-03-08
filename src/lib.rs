@@ -1,8 +1,5 @@
 #![feature(associated_type_defaults)]
 #![feature(generators, generator_trait)]
-// TODO temp
-#![allow(unused_variables)]
-#![allow(unreachable_code)]
 
 pub mod gen_iter_return_result;
 pub mod tile2d;
