@@ -93,10 +93,6 @@ where
         self.nodes.get(id.0 as usize, id.1 as usize)
     }
 
-    fn get_node_mut(&mut self, id: Index2D) -> Option<&mut Node<Index2D, NodeValue>> {
-        self.nodes.get_mut(id.0 as usize, id.1 as usize)
-    }
-
     fn iter_node_ids(&self) -> NodeIdIter<Index2D> {
         let vec: Vec<_> = gen_iter!({
             for y in 0..self.size.height {

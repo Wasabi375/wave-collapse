@@ -70,7 +70,7 @@ impl<Id, NodeValueDescription> Node<Id, NodeValueDescription> {
         Ref::map(self.possible_values.borrow(), |v| v.as_slice())
     }
 
-    pub fn possibilities(&self) -> u32 {
+    pub fn entropy(&self) -> u32 {
         self.possible_values.borrow().len() as u32
     }
 }
@@ -103,7 +103,7 @@ where
         if *self == *other {
             return Some(std::cmp::Ordering::Equal);
         }
-        self.possibilities().partial_cmp(&other.possibilities())
+        self.entropy().partial_cmp(&other.entropy())
     }
 }
 
@@ -115,7 +115,7 @@ where
         if self == other {
             return std::cmp::Ordering::Equal;
         }
-        self.possibilities().cmp(&other.possibilities())
+        self.entropy().cmp(&other.entropy())
     }
 }
 

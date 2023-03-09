@@ -36,8 +36,6 @@ pub trait WaveShape<NodeId, NodeValue: Clone> {
 
     fn get_node(&self, id: &NodeId) -> Option<&Node<NodeId, NodeValue>>;
 
-    fn get_node_mut(&mut self, id: NodeId) -> Option<&mut Node<NodeId, NodeValue>>;
-
     /// returns `true` if all nodes in the [WaveShape] are collapsed. The default implementation uses
     /// ```no_run
     /// # use wave_collapse::WaveShape;
@@ -57,10 +55,37 @@ pub trait WaveShape<NodeId, NodeValue: Clone> {
     /// # use wave_collapse::tile2d::{TileMap2D, Size2D};
     /// # let tiles: Vec<u32> = vec![];
     /// # let shape = TileMap2D::new(Size2D::square(10), Size2D::square(3), &tiles);
-    /// shape.iter_nodes().all(|node| node.is_overspecified());
+    /// shape.iter_nodes().any(|node| node.is_overspecified());
     /// ```
     fn is_overspecified(&self) -> bool {
         self.iter_nodes().any(|node| node.is_overspecified())
+    }
+
+    /// returns a random node where the [Node] has the lowest possible entropy and is not collapsed or
+    /// overspecified.
+    /// If no node is found [None] is returend.
+    fn choose_random_with_lowest_entropy(
+        &self,
+        rng: &mut impl Rng,
+    ) -> Option<&Node<NodeId, NodeValue>> {
+        let mut bucket = Vec::new();
+        let mut entropy = u32::MAX;
+        for node in self.iter_nodes() {
+            if node.is_collapsed() || node.is_overspecified() {
+                continue;
+            }
+
+            let node_entropy = node.entropy();
+            if node_entropy < entropy {
+                entropy = node_entropy;
+                bucket.clear();
+                bucket.push(node);
+            } else if node_entropy == entropy {
+                bucket.push(node);
+            }
+        }
+
+        bucket.choose(rng).map(|n| *n)
     }
 }
 
@@ -114,17 +139,8 @@ where
                 return Err(WaveCollapseError::InvalidSuperposition);
             }
 
-            // find node with the least possible values, that is not collapsed
-            // FIXME: this should be a function of shape, which can be optimized using binaryheap, etc,
-            //      however we need to know when/how to upate the heap when a node changes
-            // FIXME: choose a random node if there are multiple
-            let first_node = shape
-                .iter_nodes()
-                .filter(|n| !n.is_collapsed())
-                .min_by_key(|n| n.possibilities())
-                .expect(
-                    "This should only fail if all nodes are collapsed, but we checked that above",
-                );
+            let first_node = shape.choose_random_with_lowest_entropy(&mut rng)
+                .expect("This should never be none, because shape is not collapsed or overspecified");
 
 
             // randomly choose a value from and assign it to the first node

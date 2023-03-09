@@ -6,8 +6,8 @@ use wave_collapse::*;
 
 fn main() {
     // *************************** Settings *********************************
-    let log_steps = false;
-    let tile_size = Size2D::new(10, 10);
+    let log_steps = true;
+    let tile_size = Size2D::new(10, 10); // 100, 48
     let cutoff_behaviour = CutoffBehaviour::Ignored;
     type WrappingMode = wrapping_mode::Cutoff;
     // *************************** Settings *********************************
@@ -162,7 +162,7 @@ fn tiles() -> Vec<Tile2D> {
             bot: false,
         },
         Tile2D {
-            value: " ".to_string(),
+            value: "□".to_string(),
             left: false,
             right: false,
             top: false,
@@ -202,10 +202,10 @@ fn print_tile_map(tile_map: &TileMap2D<Tile2D>) {
         for x in 0..size.width {
             let node = tile_map.get_node(&(x, y));
             match node {
-                Some(node) => match node.possibilities() {
+                Some(node) => match node.entropy() {
                     0 => print!("x"),
                     1 => print!("{}", node.possible_values().first().unwrap().value),
-                    x => print!("{}", x.to_string()),
+                    _ => print!(" "),
                 },
                 None => print!(" "),
             };
