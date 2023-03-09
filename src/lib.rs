@@ -1,25 +1,21 @@
 #![feature(associated_type_defaults)]
 #![feature(generators, generator_trait)]
 
+pub mod binary_heap_set;
 pub mod gen_iter_return_result;
+pub mod node;
 pub mod tile2d;
 
+use binary_heap_set::BinaryHeapSet;
+use node::{Node, NodeIdIter, NodeIter};
+
 use rand::{seq::SliceRandom, Rng};
-use std::{
-    cell::{Ref, RefCell},
-    cmp::Reverse,
-    collections::BinaryHeap,
-    fmt::Debug,
-    marker::PhantomData,
-    ops::Generator,
-    rc::Rc,
-};
+use std::{cmp::Reverse, fmt::Debug, hash::Hash, ops::Generator, rc::Rc};
 
 use gen_iter::{gen_iter_return, GenIterReturn};
+
 use thiserror::Error;
 pub type Result<T> = std::result::Result<T, WaveCollapseError>;
-
-type NodeIdIter<T> = std::vec::IntoIter<T>;
 
 /// This represents a set of rules that define how to colapse a given wave function.
 pub trait WaveSolver<NodeValue, Kernel> {
@@ -87,131 +83,6 @@ pub trait WaveKernel<
     }
 }
 
-/// This describes a single node within the wave function. It contains all possible values this node can
-/// be collopsed into.
-#[derive(Clone)]
-pub struct Node<Id, NodeValueDescription> {
-    /// a unique id within a wave shape
-    id: Id,
-
-    /// all possible values this node can be collopsed into.
-    possible_values: RefCell<Vec<NodeValueDescription>>,
-}
-
-impl<Id, NodeValueDescription: Clone> Node<Id, NodeValueDescription> {
-    pub fn new<Values>(id: Id, possible_values: Values) -> Self
-    where
-        Values: Into<Vec<NodeValueDescription>>,
-    {
-        Node {
-            id,
-            possible_values: RefCell::new(possible_values.into()),
-        }
-    }
-
-    pub fn collapsed(&self) -> Option<NodeValueDescription> {
-        if self.is_collapsed() {
-            Some(self.possible_values.borrow()[0].clone())
-        } else {
-            None
-        }
-    }
-}
-
-impl<Id, NodeValueDescription> Node<Id, NodeValueDescription> {
-    pub fn is_collapsed(&self) -> bool {
-        self.possible_values.borrow().len() == 1
-    }
-
-    /// returns `true` if this node is overspecified, meaning that there are no valid
-    /// values for it left.
-    pub fn is_overspecified(&self) -> bool {
-        self.possible_values.borrow().len() == 0
-    }
-
-    pub fn possible_values(&self) -> Ref<'_, [NodeValueDescription]> {
-        Ref::map(self.possible_values.borrow(), |v| v.as_slice())
-    }
-
-    pub fn possibilities(&self) -> u32 {
-        self.possible_values.borrow().len() as u32
-    }
-}
-
-impl<Id, NodeValueDescription> Eq for Node<Id, NodeValueDescription> where Id: Eq {}
-
-impl<Id, NodeValueDescription> PartialEq for Node<Id, NodeValueDescription>
-where
-    Id: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl<Id, NodeValueDescription> PartialOrd for Node<Id, NodeValueDescription>
-where
-    Id: PartialEq,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self == other {
-            return Some(std::cmp::Ordering::Equal);
-        }
-        self.possibilities().partial_cmp(&other.possibilities())
-    }
-}
-
-impl<Id, NodeValueDescription> Ord for Node<Id, NodeValueDescription>
-where
-    Id: Eq,
-{
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self == other {
-            return std::cmp::Ordering::Equal;
-        }
-        self.possibilities().cmp(&other.possibilities())
-    }
-}
-
-pub struct NodeIter<'a, NodeId, NodeValueDescription, Shape: ?Sized> {
-    shape: &'a Shape,
-    iterator: NodeIdIter<NodeId>,
-    _id_phantom: PhantomData<NodeId>,
-    _value_phantom: PhantomData<NodeValueDescription>,
-}
-
-impl<'a, NodeId, NodeValueDescription, Shape> NodeIter<'a, NodeId, NodeValueDescription, Shape>
-where
-    Shape: ?Sized,
-{
-    fn new(iterator: NodeIdIter<NodeId>, shape: &'a Shape) -> Self {
-        NodeIter {
-            shape,
-            iterator,
-            _id_phantom: PhantomData::default(),
-            _value_phantom: PhantomData::default(),
-        }
-    }
-}
-
-impl<'a, NodeId, NodeValueDescription, Shape> Iterator
-    for NodeIter<'a, NodeId, NodeValueDescription, Shape>
-where
-    NodeId: 'a,
-    NodeValueDescription: Clone + 'a,
-    Shape: WaveShape<NodeId, NodeValueDescription> + ?Sized,
-{
-    type Item = &'a Node<NodeId, NodeValueDescription>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iterator.next().map(|id| {
-            self.shape
-                .get_node(&id)
-                .expect("A valid node iterator only returns valid node ids")
-        })
-    }
-}
-
 pub fn collapse_wave<'solver, Shape, NodeId, NodeValue, Kernel, Solver>(
     shape: Shape,
     solver: &'solver Solver,
@@ -258,7 +129,7 @@ where
             // randomly choose a value from and assign it to the first node
             collapse_node(first_node, &mut rng);
 
-            let mut open_list = BinaryHeap::new();
+            let mut open_list = BinaryHeapSet::new();
             open_list.push(Reverse(first_node));
 
             while !open_list.is_empty() {
