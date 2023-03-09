@@ -141,7 +141,7 @@ fn main() {
 fn print_tile_map(tile_map: &TileMap2D<Tile2D>) {
     let size = tile_map.size();
 
-    println!("{}", "-".repeat(size.width as usize));
+    println!("{}", "-".repeat(size.width as usize * 2 + 3));
 
     for y in 0..size.height {
         print!("| ");
@@ -159,5 +159,5 @@ fn print_tile_map(tile_map: &TileMap2D<Tile2D>) {
         }
         println!("|");
     }
-    println!("{}", "-".repeat(size.width as usize));
+    println!("{}", "-".repeat(size.width as usize * 2 + 3));
 }

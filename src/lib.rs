@@ -183,12 +183,6 @@ where
     node_values.push(collapsed_value);
 
     *node.is_collapsed.borrow_mut() = true;
-
-    #[cfg(debug_assertions)]
-    {
-        drop(node_values);
-        println!("{:?}", node);
-    }
 }
 
 trait IntoWaveCollapseErrorResult<T> {
