@@ -10,3 +10,12 @@ vecgrid = "0.2.2"
 thiserror = "1.0.38"
 gen-iter = "0.3.0"
 rand = "0.8.5"
+
+[features]
+tile2d = []
+tile3d = []
+all = ["tile2d", "tile3d"]
+
+[[example]]
+name = "simple-tileset"
+required-features  = ["tile2d"]
