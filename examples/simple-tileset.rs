@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::thread;
 use std::time::Duration;
 
+use rand::thread_rng;
 use wave_collapse::gen_iter_return_result::GenIterReturnResult;
 use wave_collapse::tile2d::*;
 use wave_collapse::*;
@@ -26,7 +27,8 @@ fn main() {
 
     let solver = TileSolver::<WrappingMode>::new(cutoff_behaviour);
 
-    let mut result_iter = collapse_wave(shape, &solver);
+    let mut rng = thread_rng();
+    let mut result_iter = collapse_wave(shape, &solver, &mut rng);
 
     if log_steps {
         for (n, shape) in &mut result_iter.enumerate() {
