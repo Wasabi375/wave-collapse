@@ -23,7 +23,7 @@ impl<T: Clone + Ord + Hash> BinaryHeapSet<T> {
     }
 
     pub fn push(&mut self, value: T) -> bool {
-        if (self.set.insert(value.clone())) {
+        if self.set.insert(value.clone()) {
             self.heap.push(value);
             true
         } else {
