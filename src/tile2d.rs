@@ -74,6 +74,14 @@ impl<NodeValue: Clone> TileMap2D<NodeValue> {
             )
         }
     }
+
+    pub fn size(&self) -> &Size2D {
+        &self.size
+    }
+
+    pub fn kernel_size(&self) -> &Size2D {
+        &self.kernel_size
+    }
 }
 
 impl<NodeValue> WaveShape<Index2D, NodeValue> for TileMap2D<NodeValue>
@@ -144,10 +152,19 @@ impl<NodeValueDescription: Clone>
     }
 
     fn iter_node_ids(&self) -> NodeIdIter<Index2D> {
-        let x_min = self.node_id.0 as i64 - self.radius_x;
-        let x_max = self.node_id.0 as i64 + self.radius_x;
-        let y_min = self.node_id.1 as i64 - self.radius_y;
-        let y_max = self.node_id.1 as i64 + self.radius_y;
+        use std::cmp::{max, min};
+
+        // TODO add wrapping option. Should be possible to model that as a generic 0 size generic parameter
+        let x_min = max(self.node_id.0 as i64 - self.radius_x, 0);
+        let x_max = min(
+            self.node_id.0 as i64 + self.radius_x,
+            self.tile_map.size.width as i64 - 1,
+        );
+        let y_min = max(self.node_id.1 as i64 - self.radius_y, 0);
+        let y_max = min(
+            self.node_id.1 as i64 + self.radius_y,
+            self.tile_map.size.height as i64 - 1,
+        );
 
         let vec: Vec<_> = gen_iter!({
             for y in y_min..=y_max {

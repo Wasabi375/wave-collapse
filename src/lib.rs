@@ -60,7 +60,7 @@ pub trait WaveShape<NodeId, NodeValue: Clone> {
     /// shape.iter_nodes().all(|node| node.is_overspecified());
     /// ```
     fn is_overspecified(&self) -> bool {
-        self.iter_nodes().all(|node| node.is_overspecified())
+        self.iter_nodes().any(|node| node.is_overspecified())
     }
 }
 
@@ -88,8 +88,8 @@ pub fn collapse_wave<'solver, Shape, NodeId, NodeValue, Kernel, Solver>(
     solver: &'solver Solver,
 ) -> GenIterReturn<impl Generator<Yield = Rc<Shape>, Return = Result<Rc<Shape>>> + '_>
 where
-    NodeId: Copy + Eq + Hash,
-    NodeValue: Clone + PartialEq,
+    NodeId: Copy + Eq + Hash + Debug,
+    NodeValue: Clone + PartialEq + Debug,
     Shape: WaveShape<NodeId, NodeValue> + 'solver,
     Kernel: WaveKernel<NodeId, NodeValue, Shape>,
     Solver: WaveSolver<NodeValue, Kernel>,
@@ -117,6 +117,7 @@ where
             // find node with the least possible values, that is not collapsed
             // FIXME: this should be a function of shape, which can be optimized using binaryheap, etc,
             //      however we need to know when/how to upate the heap when a node changes
+            // FIXME: choose a random node if there are multiple
             let first_node = shape
                 .iter_nodes()
                 .filter(|n| !n.is_collapsed())
@@ -139,14 +140,19 @@ where
 
                 let mut values = node.possible_values.borrow_mut();
                 let possibilities_before = values.len();
-                values.retain(|v| solver.is_valid(v, &kernel));
+                if !node.is_collapsed() {
+                    values.retain(|v| solver.is_valid(v, &kernel));
+                }
 
-                if possibilities_before != values.len() {
+                if node.is_collapsed() || possibilities_before != values.len() {
+
+                    drop(values);
 
                     for node in kernel
                         .iter_node_ids()
                         .filter(|id| *id != node.id)
-                        .map(|id|shape.get_node(&id).expect("NodeIdIter is always valid")) {
+                        .map(|id|shape.get_node(&id).expect(&format!("NodeIdIter is always valid. Id: {:?}", id)))
+                        .filter(|node| !node.is_collapsed()) {
                         open_list.push(Reverse(node));
                     };
 
@@ -165,7 +171,8 @@ where
 
 fn collapse_node<NodeId, NodeValue>(node: &Node<NodeId, NodeValue>, rng: &mut impl Rng)
 where
-    NodeValue: Clone + PartialEq,
+    NodeId: Debug,
+    NodeValue: Clone + PartialEq + Debug,
 {
     let mut node_values = node.possible_values.borrow_mut();
     let collapsed_value = node_values
@@ -174,6 +181,14 @@ where
         .clone();
     node_values.clear();
     node_values.push(collapsed_value);
+
+    *node.is_collapsed.borrow_mut() = true;
+
+    #[cfg(debug_assertions)]
+    {
+        drop(node_values);
+        println!("{:?}", node);
+    }
 }
 
 trait IntoWaveCollapseErrorResult<T> {
