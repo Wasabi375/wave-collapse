@@ -5,7 +5,8 @@ use std::{
 };
 
 /// A [BinaryHeap] that does not allow for duplicate entries.
-pub struct BinaryHeapSet<T> {
+#[derive(Default)]
+pub struct BinaryHeapSet<T: Clone + Ord + Hash> {
     heap: BinaryHeap<T>,
     set: HashSet<T>,
 }

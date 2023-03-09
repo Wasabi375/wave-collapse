@@ -57,7 +57,7 @@ impl<Id, NodeValueDescription: Clone> Node<Id, NodeValueDescription> {
 
 impl<Id, NodeValueDescription> Node<Id, NodeValueDescription> {
     pub fn is_collapsed(&self) -> bool {
-        self.is_collapsed.borrow().clone()
+        *self.is_collapsed.borrow()
     }
 
     /// returns `true` if this node is overspecified, meaning that there are no valid

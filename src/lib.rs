@@ -151,7 +151,7 @@ where
                     for node in kernel
                         .iter_node_ids()
                         .filter(|id| *id != node.id)
-                        .map(|id|shape.get_node(&id).expect(&format!("NodeIdIter is always valid. Id: {:?}", id)))
+                        .map(|id|shape.get_node(&id).unwrap_or_else(|| panic!("NodeIdIter is always valid. Id: {id:?}")))
                         .filter(|node| !node.is_collapsed()) {
                         open_list.push(Reverse(node));
                     };

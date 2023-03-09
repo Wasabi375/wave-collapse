@@ -4,6 +4,42 @@ use wave_collapse::gen_iter_return_result::GenIterReturnResult;
 use wave_collapse::tile2d::*;
 use wave_collapse::*;
 
+fn main() {
+    // *************************** Settings *********************************
+    let log_steps = false;
+    let tile_size = Size2D::new(10, 10);
+    let cutoff_behaviour = CutoffBehaviour::Ignored;
+    type WrappingMode = wrapping_mode::Cutoff;
+    // *************************** Settings *********************************
+
+    let tiles = tiles();
+    let shape = TileMap2D::new(tile_size, Size2D::square(3), &tiles);
+
+    if log_steps {
+        println!("Initial Position");
+        print_tile_map(&shape);
+    }
+
+    let solver = TileSolver::<WrappingMode>::new(cutoff_behaviour);
+
+    let mut result_iter = collapse_wave(shape, &solver);
+
+    if log_steps {
+        for (n, shape) in &mut result_iter.enumerate() {
+            println!("Iteration {}", n);
+            print_tile_map(&shape);
+            println!("");
+        }
+        println!("");
+    }
+
+    println!("Result: ");
+    match result_iter.calc_result() {
+        Ok(shape) => print_tile_map(&shape),
+        Err(error) => eprintln!("Failed to collapse wave: {:?}", error),
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Tile2D {
     value: String,
@@ -13,6 +49,7 @@ pub struct Tile2D {
     bot: bool,
 }
 
+#[allow(dead_code)]
 enum CutoffBehaviour {
     Wall,
     Passage,
@@ -153,31 +190,6 @@ fn tiles() -> Vec<Tile2D> {
             bot: true,
         },
     ]
-}
-
-fn main() {
-    let tiles = tiles();
-    let shape = TileMap2D::new(Size2D::square(10), Size2D::square(3), &tiles);
-
-    // println!("Initial Position");
-    // print_tile_map(&shape);
-
-    let solver = TileSolver::<wrapping_mode::Wrapping>::new(CutoffBehaviour::Ignored);
-
-    let mut result_iter = collapse_wave(shape, &solver);
-
-    // for (n, shape) in &mut result_iter.enumerate() {
-    //     println!("Iteration {}", n);
-    //     print_tile_map(&shape);
-    //     println!("");
-    // }
-
-    println!("");
-    println!("Result: ");
-    match result_iter.calc_result() {
-        Ok(shape) => print_tile_map(&shape),
-        Err(error) => eprintln!("Failed to collapse wave: {:?}", error),
-    }
 }
 
 fn print_tile_map(tile_map: &TileMap2D<Tile2D>) {
