@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use vecgrid::Vecgrid;
@@ -13,7 +14,7 @@ pub struct Size2D {
     pub height: u32,
 }
 
-type Index2D = (u32, u32);
+pub type Index2D = (u32, u32);
 
 impl Size2D {
     pub fn new(width: u32, height: u32) -> Size2D {
@@ -110,14 +111,36 @@ where
     }
 }
 
-pub struct Kernel2D<NodeValueDescription: Clone> {
+pub mod wrapping_mode {
+    pub struct Wrapping;
+    pub struct Cutoff;
+}
+
+pub struct Kernel2D<WrappingMode, NodeValueDescription: Clone> {
     tile_map: Rc<TileMap2D<NodeValueDescription>>,
     node_id: Index2D,
     pub radius_x: i64,
     pub radius_y: i64,
+    _wrapping_mode: PhantomData<WrappingMode>,
 }
 
-impl<NodeValueDescription: Clone> Kernel2D<NodeValueDescription> {
+impl<WrappingMode, NodeValueDescription: Clone> Kernel2D<WrappingMode, NodeValueDescription> {
+    fn new(
+        shape: Rc<TileMap2D<NodeValueDescription>>,
+        node: &Node<Index2D, NodeValueDescription>,
+    ) -> Self {
+        let radius_y = ((shape.kernel_size.height - 1) / 2) as i64;
+        let radius_x = ((shape.kernel_size.width - 1) / 2) as i64;
+
+        Kernel2D {
+            tile_map: shape,
+            node_id: node.id,
+            radius_x,
+            radius_y,
+            _wrapping_mode: PhantomData::default(),
+        }
+    }
+
     pub fn get(&self, x: i64, y: i64) -> Option<&Node<Index2D, NodeValueDescription>> {
         if x.abs() > self.radius_x || y.abs() > self.radius_y {
             return None;
@@ -134,27 +157,18 @@ impl<NodeValueDescription: Clone> Kernel2D<NodeValueDescription> {
 
 impl<NodeValueDescription: Clone>
     WaveKernel<Index2D, NodeValueDescription, TileMap2D<NodeValueDescription>>
-    for Kernel2D<NodeValueDescription>
+    for Kernel2D<wrapping_mode::Cutoff, NodeValueDescription>
 {
     fn new(
         shape: Rc<TileMap2D<NodeValueDescription>>,
         node: &Node<Index2D, NodeValueDescription>,
     ) -> Self {
-        let radius_y = ((shape.kernel_size.height - 1) / 2) as i64;
-        let radius_x = ((shape.kernel_size.width - 1) / 2) as i64;
-
-        Kernel2D {
-            tile_map: shape,
-            node_id: node.id,
-            radius_x,
-            radius_y,
-        }
+        Kernel2D::new(shape, node)
     }
 
     fn iter_node_ids(&self) -> NodeIdIter<Index2D> {
         use std::cmp::{max, min};
 
-        // TODO add wrapping option. Should be possible to model that as a generic 0 size generic parameter
         let x_min = max(self.node_id.0 as i64 - self.radius_x, 0);
         let x_max = min(
             self.node_id.0 as i64 + self.radius_x,
@@ -170,6 +184,38 @@ impl<NodeValueDescription: Clone>
             for y in y_min..=y_max {
                 for x in x_min..=x_max {
                     yield (x as u32, y as u32);
+                }
+            }
+        })
+        .collect();
+        vec.into_iter()
+    }
+}
+
+impl<NodeValueDescription: Clone>
+    WaveKernel<Index2D, NodeValueDescription, TileMap2D<NodeValueDescription>>
+    for Kernel2D<wrapping_mode::Wrapping, NodeValueDescription>
+{
+    fn new(
+        shape: Rc<TileMap2D<NodeValueDescription>>,
+        node: &Node<Index2D, NodeValueDescription>,
+    ) -> Self {
+        Kernel2D::new(shape, node)
+    }
+
+    fn iter_node_ids(&self) -> NodeIdIter<Index2D> {
+        let x_min = self.node_id.0 as i64 - self.radius_x;
+        let x_max = self.node_id.0 as i64 + self.radius_x;
+        let y_min = self.node_id.1 as i64 - self.radius_y;
+        let y_max = self.node_id.1 as i64 + self.radius_y;
+
+        let vec: Vec<_> = gen_iter!({
+            for y in y_min..=y_max {
+                for x in x_min..=x_max {
+                    yield (
+                        x.rem_euclid(self.tile_map.size.width as i64) as u32,
+                        y.rem_euclid(self.tile_map.size.height as i64) as u32,
+                    );
                 }
             }
         })

@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use wave_collapse::gen_iter_return_result::GenIterReturnResult;
 use wave_collapse::tile2d::*;
 use wave_collapse::*;
@@ -11,10 +13,45 @@ pub struct Tile2D {
     bot: bool,
 }
 
-pub struct TileSolver;
+enum CutoffBehaviour {
+    Wall,
+    Passage,
+    Ignored,
+}
 
-impl TileSolver {
-    fn is_tile_valid(&self, tile: &Tile2D, kernel: &Kernel2D<Tile2D>) -> bool {
+impl CutoffBehaviour {
+    fn cutoff(&self, passage: bool) -> bool {
+        match self {
+            CutoffBehaviour::Wall => !passage,
+            CutoffBehaviour::Passage => passage,
+            CutoffBehaviour::Ignored => true,
+        }
+    }
+}
+
+pub struct TileSolver<WrappingMode> {
+    cutoff_behaviour: CutoffBehaviour,
+    _wrapping_mode: PhantomData<WrappingMode>,
+}
+
+impl<WrappingMode> Default for TileSolver<WrappingMode> {
+    fn default() -> Self {
+        Self {
+            cutoff_behaviour: CutoffBehaviour::Ignored,
+            _wrapping_mode: Default::default(),
+        }
+    }
+}
+
+impl<WrappingMode> TileSolver<WrappingMode> {
+    fn new(cutoff_behaviour: CutoffBehaviour) -> Self {
+        Self {
+            cutoff_behaviour,
+            _wrapping_mode: Default::default(),
+        }
+    }
+
+    fn is_tile_valid(&self, tile: &Tile2D, kernel: &Kernel2D<WrappingMode, Tile2D>) -> bool {
         assert!(kernel.radius_x == 1 && kernel.radius_y == 1);
 
         let left_node = kernel.get(-1, 0);
@@ -28,7 +65,7 @@ impl TileSolver {
                     .iter()
                     .any(|other_tile| tile.left == other_tile.right)
             })
-            .unwrap_or(!tile.left);
+            .unwrap_or(self.cutoff_behaviour.cutoff(tile.left));
 
         let right_valid = right_node
             .map(|node| {
@@ -36,7 +73,7 @@ impl TileSolver {
                     .iter()
                     .any(|other_tile| tile.right == other_tile.left)
             })
-            .unwrap_or(!tile.right);
+            .unwrap_or(self.cutoff_behaviour.cutoff(tile.right));
 
         let top_valid = top_node
             .map(|node| {
@@ -44,7 +81,7 @@ impl TileSolver {
                     .iter()
                     .any(|other_tile| tile.top == other_tile.bot)
             })
-            .unwrap_or(!tile.top);
+            .unwrap_or(self.cutoff_behaviour.cutoff(tile.top));
 
         let bot_valid = bot_node
             .map(|node| {
@@ -52,20 +89,20 @@ impl TileSolver {
                     .iter()
                     .any(|other_tile| tile.bot == other_tile.top)
             })
-            .unwrap_or(!tile.bot);
+            .unwrap_or(self.cutoff_behaviour.cutoff(tile.bot));
 
         left_valid && right_valid && top_valid && bot_valid
     }
 }
 
-impl WaveSolver<Tile2D, Kernel2D<Tile2D>> for TileSolver {
-    fn is_valid(&self, tile: &Tile2D, kernel: &Kernel2D<Tile2D>) -> bool {
+impl<WrappingMode> WaveSolver<Tile2D, Kernel2D<WrappingMode, Tile2D>> for TileSolver<WrappingMode> {
+    fn is_valid(&self, tile: &Tile2D, kernel: &Kernel2D<WrappingMode, Tile2D>) -> bool {
         self.is_tile_valid(tile, kernel)
     }
 }
 
-fn main() {
-    let tiles: Vec<Tile2D> = vec![
+fn tiles() -> Vec<Tile2D> {
+    vec![
         Tile2D {
             value: "_".to_string(),
             left: true,
@@ -115,20 +152,25 @@ fn main() {
             top: false,
             bot: true,
         },
-    ];
+    ]
+}
 
-    let shape = TileMap2D::new(Size2D::square(4), Size2D::square(3), &tiles);
+fn main() {
+    let tiles = tiles();
+    let shape = TileMap2D::new(Size2D::square(10), Size2D::square(3), &tiles);
 
-    println!("Initial Position");
-    print_tile_map(&shape);
+    // println!("Initial Position");
+    // print_tile_map(&shape);
 
-    let mut result_iter = collapse_wave(shape, &TileSolver);
+    let solver = TileSolver::<wrapping_mode::Wrapping>::new(CutoffBehaviour::Ignored);
 
-    for (n, shape) in &mut result_iter.enumerate() {
-        println!("Iteration {}", n);
-        print_tile_map(&shape);
-        println!("");
-    }
+    let mut result_iter = collapse_wave(shape, &solver);
+
+    // for (n, shape) in &mut result_iter.enumerate() {
+    //     println!("Iteration {}", n);
+    //     print_tile_map(&shape);
+    //     println!("");
+    // }
 
     println!("");
     println!("Result: ");
@@ -150,7 +192,7 @@ fn print_tile_map(tile_map: &TileMap2D<Tile2D>) {
             match node {
                 Some(node) => match node.possibilities() {
                     0 => print!("x"),
-                    1 => print!("{}", node.collapsed().unwrap().value),
+                    1 => print!("{}", node.possible_values().first().unwrap().value),
                     x => print!("{}", x.to_string()),
                 },
                 None => print!(" "),
