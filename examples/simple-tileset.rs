@@ -1,4 +1,7 @@
+use std::io::stdin;
 use std::marker::PhantomData;
+use std::thread;
+use std::time::Duration;
 
 use wave_collapse::gen_iter_return_result::GenIterReturnResult;
 use wave_collapse::tile2d::*;
@@ -7,6 +10,7 @@ use wave_collapse::*;
 fn main() {
     // *************************** Settings *********************************
     let log_steps = true;
+    let wait_for_user = true;
     let tile_size = Size2D::new(10, 10); // 100, 48
     let cutoff_behaviour = CutoffBehaviour::Ignored;
     type WrappingMode = wrapping_mode::Cutoff;
@@ -26,17 +30,20 @@ fn main() {
 
     if log_steps {
         for (n, shape) in &mut result_iter.enumerate() {
-            println!("Iteration {}", n);
+            if wait_for_user {
+                let mut buf = String::new();
+                let _ = stdin().read_line(&mut buf);
+            }
+            println!("Iteration {n}");
             print_tile_map(&shape);
-            println!("");
         }
-        println!("");
+        println!();
     }
 
     println!("Result: ");
     match result_iter.calc_result() {
         Ok(shape) => print_tile_map(&shape),
-        Err(error) => eprintln!("Failed to collapse wave: {:?}", error),
+        Err(error) => eprintln!("Failed to collapse wave: {error:?}"),
     }
 }
 

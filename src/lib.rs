@@ -76,6 +76,7 @@ pub trait WaveShape<NodeId, NodeValue: Clone> {
             }
 
             let node_entropy = node.entropy();
+            #[allow(clippy::comparison_chain)]
             if node_entropy < entropy {
                 entropy = node_entropy;
                 bucket.clear();
@@ -85,7 +86,7 @@ pub trait WaveShape<NodeId, NodeValue: Clone> {
             }
         }
 
-        bucket.choose(rng).map(|n| *n)
+        bucket.choose(rng).copied()
     }
 }
 
