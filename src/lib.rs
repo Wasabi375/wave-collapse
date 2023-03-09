@@ -88,7 +88,7 @@ pub fn collapse_wave<'solver, Shape, NodeId, NodeValue, Kernel, Solver>(
     solver: &'solver Solver,
 ) -> GenIterReturn<impl Generator<Yield = Rc<Shape>, Return = Result<Rc<Shape>>> + '_>
 where
-    NodeId: Copy + Eq,
+    NodeId: Copy + Eq + Hash,
     NodeValue: Clone + PartialEq,
     Shape: WaveShape<NodeId, NodeValue> + 'solver,
     Kernel: WaveKernel<NodeId, NodeValue, Shape>,
