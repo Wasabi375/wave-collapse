@@ -21,7 +21,7 @@ fn main() {
 
     if log_steps {
         println!("Initial Position");
-        print_tile_map(&shape);
+        print_tile_map(&shape, false);
     }
 
     let solver = TileSolver::<WrappingMode>::new(cutoff_behaviour);
@@ -35,14 +35,14 @@ fn main() {
                 let _ = stdin().read_line(&mut buf);
             }
             println!("Iteration {n}");
-            print_tile_map(&shape);
+            print_tile_map(&shape, wait_for_user);
         }
         println!();
     }
 
     println!("Result: ");
     match result_iter.calc_result() {
-        Ok(shape) => print_tile_map(&shape),
+        Ok(shape) => print_tile_map(&shape, false),
         Err(error) => eprintln!("Failed to collapse wave: {error:?}"),
     }
 }
@@ -199,7 +199,7 @@ fn tiles() -> Vec<Tile2D> {
     ]
 }
 
-fn print_tile_map(tile_map: &TileMap2D<Tile2D>) {
+fn print_tile_map(tile_map: &TileMap2D<Tile2D>, user_step: bool) {
     let size = tile_map.size();
 
     println!("{}", "-".repeat(size.width as usize * 2 + 3));
@@ -209,11 +209,23 @@ fn print_tile_map(tile_map: &TileMap2D<Tile2D>) {
         for x in 0..size.width {
             let node = tile_map.get_node(&(x, y));
             match node {
-                Some(node) => match node.entropy() {
-                    0 => print!("x"),
-                    1 => print!("{}", node.possible_values().first().unwrap().value),
-                    _ => print!(" "),
-                },
+                Some(node) => {
+                    if !user_step {
+                        match node.entropy() {
+                            0 => print!("x"),
+                            1 => print!("{}", node.possible_values().first().unwrap().value),
+                            _ => print!(" "),
+                        }
+                    } else {
+                        if node.is_overspecified() {
+                            print!("x");
+                        } else if node.is_collapsed() {
+                            print!("{}", node.collapsed().unwrap().value)
+                        } else {
+                            print!("{}", node.entropy());
+                        }
+                    }
+                }
                 None => print!(" "),
             };
             print!(" ")
