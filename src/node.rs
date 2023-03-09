@@ -5,7 +5,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::WaveShape;
+use crate::wave_function::WaveShape;
 
 /// This describes a single node within the wave function. It contains all possible values this node can
 /// be collopsed into.
@@ -122,7 +122,7 @@ where
 /// The internally used iterator type when iterating node ids.
 pub type NodeIdIter<T> = std::vec::IntoIter<T>;
 
-/// An iterator over nodes, that uses [NodeIdIter] and [crate::WaveShape] to
+/// An iterator over nodes, that uses [NodeIdIter] and [WaveShape] to
 /// iterate nodes.
 pub struct NodeIter<'a, NodeId, NodeValueDescription, Shape: ?Sized> {
     shape: &'a Shape,

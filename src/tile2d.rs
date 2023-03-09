@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use vecgrid::Vecgrid;
 
-use crate::NodeIdIter;
-use crate::{Node, WaveKernel, WaveShape};
+use crate::node::{Node, NodeIdIter};
+use crate::wave_function::{WaveKernel, WaveShape};
 
 use gen_iter::gen_iter;
 

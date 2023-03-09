@@ -2,7 +2,7 @@ use std::{ops::Generator, rc::Rc};
 
 use gen_iter::GenIterReturn;
 
-use crate::WaveCollapseError;
+use crate::error::WaveCollapseError;
 
 pub trait GenIterReturnResult<T> {
     fn calc_result(self) -> Result<Rc<T>, WaveCollapseError>;

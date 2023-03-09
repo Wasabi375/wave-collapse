@@ -1,11 +1,9 @@
 use std::io::stdin;
 use std::marker::PhantomData;
-use std::thread;
-use std::time::Duration;
 
 use rand::thread_rng;
-use wave_collapse::gen_iter_return_result::GenIterReturnResult;
 use wave_collapse::tile2d::*;
+use wave_collapse::wave_function::{WaveShape, WaveSolver};
 use wave_collapse::*;
 
 fn main() {
@@ -219,6 +217,7 @@ fn print_tile_map(tile_map: &TileMap2D<Tile2D>, user_step: bool) {
                             _ => print!(" "),
                         }
                     } else {
+                        #[allow(clippy::collapsible_else_if)]
                         if node.is_overspecified() {
                             print!("x");
                         } else if node.is_collapsed() {
