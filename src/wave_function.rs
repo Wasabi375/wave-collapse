@@ -78,6 +78,14 @@ pub trait WaveShape<NodeId, NodeValue: Clone> {
 
         bucket.choose(rng).copied()
     }
+
+    /// called by [collapse_wave] so that it is possible to track progress.
+    /// It is valid for an implementation to ignore this and always return [None] fron `get_last_collapsed`
+    fn set_last_collapsed_id(&self, node_id: NodeId);
+
+    /// returns the id of the [Node] set by `set_last_collapsed_id`.
+    /// It is valid for an implementation to always return [None].
+    fn get_last_collapsed_id(&self) -> Option<NodeId>;
 }
 
 /// A wave kernel is a structure that represents all nodes that can affect the [Node] that is
@@ -177,6 +185,7 @@ where
 
             // randomly choose a value from and assign it to the first node
             collapse_node(first_node, rng);
+            shape.set_last_collapsed_id(first_node.id);
 
             let mut open_list = BinaryHeapSet::new();
             open_list.push(Reverse(first_node));

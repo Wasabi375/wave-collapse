@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
@@ -30,6 +31,8 @@ pub struct TileMap2D<NodeValue: Clone> {
     size: Size2D,
     kernel_size: Size2D,
 
+    last_collapsed: RefCell<Option<Index2D>>,
+
     nodes: Vecgrid<Node<Index2D, NodeValue>>,
 }
 
@@ -50,6 +53,7 @@ impl<NodeValue: Clone> TileMap2D<NodeValue> {
         TileMap2D {
             size,
             kernel_size,
+            last_collapsed: RefCell::new(None),
             nodes: Vecgrid::from_column_major(data, size.width as usize, size.height as usize)
                 .expect("data size should be valid"),
         }
@@ -104,6 +108,14 @@ where
         .collect();
 
         vec.into_iter()
+    }
+
+    fn set_last_collapsed_id(&self, node_id: Index2D) {
+        let _ = self.last_collapsed.borrow_mut().insert(node_id);
+    }
+
+    fn get_last_collapsed_id(&self) -> Option<Index2D> {
+        *self.last_collapsed.borrow()
     }
 }
 
