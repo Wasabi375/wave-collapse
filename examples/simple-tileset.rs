@@ -2,6 +2,7 @@ use std::io::stdin;
 use std::marker::PhantomData;
 
 use rand::thread_rng;
+use termion::color::{Fg, Green, Magenta, Red, Reset};
 use wave_collapse::tile2d::*;
 use wave_collapse::wave_function::{WaveShape, WaveSolver};
 use wave_collapse::*;
@@ -10,6 +11,7 @@ fn main() {
     // *************************** Settings *********************************
     let log_steps = true;
     let wait_for_user = true;
+    let color = true;
     let tile_size = Size2D::new(10, 10); // 100, 48
     let cutoff_behaviour = CutoffBehaviour::Ignored;
     type WrappingMode = wrapping_mode::Cutoff;
@@ -20,7 +22,7 @@ fn main() {
 
     if log_steps {
         println!("Initial Position");
-        print_tile_map(&shape, false);
+        print_tile_map(&shape, false, color);
     }
 
     let solver = TileSolver::<WrappingMode>::new(cutoff_behaviour);
@@ -35,14 +37,14 @@ fn main() {
                 let _ = stdin().read_line(&mut buf);
             }
             println!("Iteration {n}");
-            print_tile_map(&shape, wait_for_user);
+            print_tile_map(&shape, wait_for_user, color);
         }
         println!();
     }
 
     println!("Result: ");
     match result_iter.calc_result() {
-        Ok(shape) => print_tile_map(&shape, false),
+        Ok(shape) => print_tile_map(&shape, false, color),
         Err(error) => eprintln!("Failed to collapse wave: {error:?}"),
     }
 }
@@ -199,10 +201,37 @@ fn tiles() -> Vec<Tile2D> {
     ]
 }
 
-fn print_tile_map(tile_map: &TileMap2D<Tile2D>, user_step: bool) {
+fn print_tile_map(tile_map: &TileMap2D<Tile2D>, user_step: bool, use_color: bool) {
     let size = tile_map.size();
 
     println!("{}", "-".repeat(size.width as usize * 2 + 3));
+
+    let set_collapsed_color = |id: Index2D| {
+        if !use_color {
+            return;
+        }
+        if use_color && Some(id) == tile_map.get_last_collapsed_id() {
+            print!("{}", Fg(Green));
+        } else {
+            print!("{}", Fg(Reset));
+        }
+    };
+    let set_error_color = |id: Index2D| {
+        if !use_color {
+            return;
+        }
+        if Some(id) == tile_map.get_last_collapsed_id() {
+            print!("{}", Fg(Magenta));
+        } else {
+            print!("{}", Fg(Red));
+        };
+    };
+    let reset_color = || {
+        if !use_color {
+            return;
+        }
+        print!("{}", Fg(Reset));
+    };
 
     for y in 0..size.height {
         print!("| ");
@@ -212,17 +241,26 @@ fn print_tile_map(tile_map: &TileMap2D<Tile2D>, user_step: bool) {
                 Some(node) => {
                     if !user_step {
                         match node.entropy() {
-                            0 => print!("x"),
-                            1 => print!("{}", node.possible_values().first().unwrap().value),
+                            0 => {
+                                set_error_color(node.id);
+                                print!("x")
+                            }
+                            1 => {
+                                set_collapsed_color(node.id);
+                                print!("{}", node.possible_values().first().unwrap().value)
+                            }
                             _ => print!(" "),
                         }
                     } else {
                         #[allow(clippy::collapsible_else_if)]
                         if node.is_overspecified() {
+                            set_error_color(node.id);
                             print!("x");
                         } else if node.is_collapsed() {
+                            set_collapsed_color(node.id);
                             print!("{}", node.collapsed().unwrap().value)
                         } else {
+                            reset_color();
                             print!("{}", node.entropy());
                         }
                     }
@@ -231,6 +269,7 @@ fn print_tile_map(tile_map: &TileMap2D<Tile2D>, user_step: bool) {
             };
             print!(" ")
         }
+        reset_color();
         println!("|");
     }
     println!("{}", "-".repeat(size.width as usize * 2 + 3));

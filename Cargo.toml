@@ -11,6 +11,9 @@ thiserror = "1.0.38"
 gen-iter = "0.3.0"
 rand = "0.8.5"
 
+[dev-dependencies]
+termion = "2.0.1"
+
 [features]
 tile2d = []
 tile3d = []
