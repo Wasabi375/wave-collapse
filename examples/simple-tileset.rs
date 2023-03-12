@@ -10,14 +10,14 @@ use wave_collapse::*;
 fn main() {
     // *************************** Settings *********************************
     let log_steps = true;
-    let wait_for_user = true;
+    let wait_for_user = false;
     let color = true;
-    let tile_size = Size2D::new(10, 10); // 100, 48
+    let tile_size = Size2D::new(50, 16); // 50, 16
     let cutoff_behaviour = CutoffBehaviour::Ignored;
-    type WrappingMode = wrapping_mode::Cutoff;
+    type WrappingMode = wrapping_mode::Wrapping;
+    let tiles = tiles_all();
     // *************************** Settings *********************************
 
-    let tiles = tiles();
     let shape = TileMap2D::new(tile_size, Size2D::square(3), &tiles);
 
     if log_steps {
@@ -51,11 +51,53 @@ fn main() {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Tile2D {
-    value: String,
     left: bool,
     right: bool,
     top: bool,
     bot: bool,
+}
+
+impl Tile2D {
+    fn get_char_at(&self, x: u32, y: u32) -> char {
+        match (x, y) {
+            (1, 1) => {
+                if self.left || self.right || self.bot || self.top {
+                    '+'
+                } else {
+                    ' '
+                }
+            }
+            (0, 1) => {
+                if self.left {
+                    '-'
+                } else {
+                    ' '
+                }
+            }
+            (2, 1) => {
+                if self.right {
+                    '-'
+                } else {
+                    ' '
+                }
+            }
+            (1, 0) => {
+                if self.top {
+                    '|'
+                } else {
+                    ' '
+                }
+            }
+            (1, 2) => {
+                if self.bot {
+                    '|'
+                } else {
+                    ' '
+                }
+            }
+            _ => ' ',
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -150,49 +192,42 @@ impl<WrappingMode> WaveSolver<Tile2D, Kernel2D<WrappingMode, Tile2D>> for TileSo
 fn tiles() -> Vec<Tile2D> {
     vec![
         Tile2D {
-            value: "_".to_string(),
             left: true,
             right: true,
             top: false,
             bot: false,
         },
         Tile2D {
-            value: "A".to_string(),
             left: true,
             right: true,
             top: true,
             bot: false,
         },
         Tile2D {
-            value: "L".to_string(),
             left: false,
             right: true,
             top: true,
             bot: false,
         },
         Tile2D {
-            value: "□".to_string(),
             left: false,
             right: false,
             top: false,
             bot: false,
         },
         Tile2D {
-            value: "|".to_string(),
             left: false,
             right: false,
             top: true,
             bot: true,
         },
         Tile2D {
-            value: "P".to_string(),
             left: false,
             right: true,
             top: false,
             bot: true,
         },
         Tile2D {
-            value: "T".to_string(),
             left: true,
             right: true,
             top: false,
@@ -201,11 +236,34 @@ fn tiles() -> Vec<Tile2D> {
     ]
 }
 
+fn tiles_all() -> Vec<Tile2D> {
+    let mut result = Vec::new();
+
+    let b = [true, false];
+    for left in b {
+        for right in b {
+            for top in b {
+                for bot in b {
+                    result.push(Tile2D {
+                        left,
+                        right,
+                        top,
+                        bot,
+                    })
+                }
+            }
+        }
+    }
+    assert!(result.len() == 16);
+    result
+}
+
 fn print_tile_map(tile_map: &TileMap2D<Tile2D>, user_step: bool, use_color: bool) {
     let size = tile_map.size();
 
-    println!("{}", "-".repeat(size.width as usize * 2 + 3));
+    // println!("{}", "-".repeat(size.width as usize * 2 + 3));
 
+    /*
     let set_collapsed_color = |id: Index2D| {
         if !use_color {
             return;
@@ -232,45 +290,30 @@ fn print_tile_map(tile_map: &TileMap2D<Tile2D>, user_step: bool, use_color: bool
         }
         print!("{}", Fg(Reset));
     };
+    */
 
     for y in 0..size.height {
-        print!("| ");
-        for x in 0..size.width {
-            let node = tile_map.get_node(&(x, y));
-            match node {
-                Some(node) => {
-                    if !user_step {
-                        match node.entropy() {
-                            0 => {
-                                set_error_color(node.id);
-                                print!("x")
-                            }
-                            1 => {
-                                set_collapsed_color(node.id);
-                                print!("{}", node.possible_values().first().unwrap().value)
-                            }
-                            _ => print!(" "),
+        for sub_y in 0..3 {
+            for x in 0..size.width {
+                let node = tile_map.get_node(&(x, y)).unwrap();
+                for sub_x in 0..3 {
+                    // TODO add color
+                    if node.is_overspecified() {
+                        print!("X");
+                    } else if let Some(tile) = node.collapsed() {
+                        print!("{}", tile.get_char_at(sub_x, sub_y));
+                    } else if user_step {
+                        if sub_x == 1 && sub_y == 1 {
+                            print!("{:2X}", node.entropy());
+                        } else if sub_x == 2 || sub_y != 1 {
+                            print!("O");
                         }
                     } else {
-                        #[allow(clippy::collapsible_else_if)]
-                        if node.is_overspecified() {
-                            set_error_color(node.id);
-                            print!("x");
-                        } else if node.is_collapsed() {
-                            set_collapsed_color(node.id);
-                            print!("{}", node.collapsed().unwrap().value)
-                        } else {
-                            reset_color();
-                            print!("{}", node.entropy());
-                        }
+                        print!(" ");
                     }
                 }
-                None => print!(" "),
-            };
-            print!(" ")
+            }
+            println!();
         }
-        reset_color();
-        println!("|");
     }
-    println!("{}", "-".repeat(size.width as usize * 2 + 3));
 }
