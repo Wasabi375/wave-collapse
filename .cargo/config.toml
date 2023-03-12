@@ -1,5 +1,3 @@
 [registries.crates-io]
 protocol = 'sparse'
 
-[unstable]
-sparse-registry = true
